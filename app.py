@@ -12,7 +12,7 @@ st.title("🎨 我的 AI 艺术生成器")
 import os  # 确保文件最上方引入了 os 库
 
 # 接口地址
-URL = "https://api.headone.fit/v1/images/generations"
+URL = "https://nowcoding.ai/v1/images/generations"
 
 # ⭐️ 关键修改：让代码去系统的“环境变量”里寻找叫 MY_API_KEY 的值
 API_KEY = os.getenv("MY_API_KEY")
