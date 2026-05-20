@@ -16,10 +16,6 @@ if "current_placeholder" not in st.session_state:
 if "is_loading" not in st.session_state:
     st.session_state.is_loading = False
 
-# 高级面板状态锁
-if "expander_state" not in st.session_state:
-    st.session_state.expander_state = False
-
 # 读取环境变量密码
 IMAGE_API_KEY = os.getenv("MY_IMAGE_API_KEY")
 CHAT_API_KEY = os.getenv("MY_CHAT_API_KEY")
@@ -88,7 +84,7 @@ def translate_and_optimize_prompt(api_key, user_prompt):
         return user_prompt
 
 # ==================== 3. 经典至尊版原生 UI 排版 ====================
-# 【组件隐藏核心】：一次性抹除所有不需要的系统挂件
+# 【完全保留】上一版的组件隐藏魔法，界面绝对干净
 st.markdown("""
 <style>
     /* 彻底隐藏右上角的汉堡菜单 (包含 Rerun, Settings 等) */
@@ -142,34 +138,23 @@ chosen_style = st.selectbox(
 )
 
 # ==================== 4. 高级隐藏配置面板 ====================
-use_panel = st.checkbox("🛠️ 开启影像精细化渲染高级控制面板", value=st.session_state.expander_state)
-st.session_state.expander_state = use_panel
-
-if st.session_state.expander_state:
-    with st.container():
-        st.markdown('<div style="border: 1px solid rgba(128,128,128,0.2); padding: 15px; border-radius: 8px; margin-bottom: 15px;">', unsafe_allow_html=True)
-        col1, col2 = st.columns(2)
-        with col1:
-            aspect_ratio = st.selectbox(
-                "📐 图像构图画幅比例：",
-                ["1:1 标准方形 (1024x1024)", "16:9 宽银幕壁纸 (1024x576)", "9:16 移动端海报 (576x1024)"]
-            )
-        with col2:
-            quality = st.selectbox("🎭 影像生成质量：", ["standard (标准影像)", "hd (超清影像增强)"])
-            
-        negative_prompt = st.text_input("🚫 负向提示词 (排除画面多余元素):", placeholder="例如：变形、低画质、崩坏的肢体、模糊、水印")
+# 【修复点】：去除了死板的复选框，完全恢复原汁原味的 `st.expander` 折叠面板，且不再强加 expanded 参数
+with st.expander("🛠️ 影像精细化渲染高级控制面板"):
+    col1, col2 = st.columns(2)
+    with col1:
+        aspect_ratio = st.selectbox(
+            "📐 图像构图画幅比例：",
+            ["1:1 标准方形 (1024x1024)", "16:9 宽银幕壁纸 (1024x576)", "9:16 移动端海报 (576x1024)"]
+        )
+    with col2:
+        quality = st.selectbox("🎭 影像生成质量：", ["standard (标准影像)", "hd (超清影像增强)"])
         
-        st.markdown("---")
-        st.write("🔒 **特征锁定矩阵 (创作连环画/分镜故事核心)：**")
-        use_seed = st.checkbox("固定特征种子 (开启后可微调文字进行画面连贯创作)", value=False)
-        custom_seed = st.number_input("设置固定的随机种子数值：", min_value=1, max_value=9999999, value=88888)
-        st.markdown('</div>', unsafe_allow_html=True)
-else:
-    aspect_ratio = "1:1 标准方形 (1024x1024)"
-    quality = "standard (标准影像)"
-    negative_prompt = ""
-    use_seed = False
-    custom_seed = 88888
+    negative_prompt = st.text_input("🚫 负向提示词 (排除画面多余元素):", placeholder="例如：变形、低画质、崩坏的肢体、模糊、水印")
+    
+    st.markdown("---")
+    st.write("🔒 **特征锁定矩阵 (创作连环画/分镜故事核心)：**")
+    use_seed = st.checkbox("固定特征种子 (开启后可微调文字进行画面连贯创作)", value=False)
+    custom_seed = st.number_input("设置固定的随机种子数值：", min_value=1, max_value=9999999, value=88888)
 
 size_mapping = {
     "1:1 标准方形 (1024x1024)": "1024x1024",
