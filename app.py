@@ -10,7 +10,7 @@ load_dotenv()
 # ==================== 1. 系统级专业配置 ====================
 st.set_page_config(page_title="智能影像生成控制台", layout="centered")
 
-# 初始化系统缓存变量（带防重复获取锁）
+# 初始化系统缓存变量
 if "current_placeholder" not in st.session_state:
     st.session_state.current_placeholder = "点击下方按钮获取灵感，或在此直接输入您的创意描述..."
 if "is_loading" not in st.session_state:
@@ -88,7 +88,17 @@ def translate_and_optimize_prompt(api_key, user_prompt):
         return user_prompt
 
 # ==================== 3. 经典至尊版原生 UI 排版 ====================
+# 【修复点】：在这里加入了隐藏顶部菜单和底部水印的专属 CSS 样式
 st.markdown("""
+<style>
+    /* 彻底隐藏右上角的汉堡菜单 (包含 Rerun, Settings 等) */
+    #MainMenu {visibility: hidden;}
+    /* 彻底隐藏顶部那一整条白色的 Header 栏 */
+    header {visibility: hidden;}
+    /* 彻底隐藏底部的 Made with Streamlit 水印 */
+    footer {visibility: hidden;}
+</style>
+
 <div style="background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%); padding: 22px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
     <h2 style="color: white; margin: 0; text-align: center; font-family: Arial; letter-spacing: 2px;">AIGC 智能影像生成控制台</h2>
     <p style="color: #00ecff; margin: 5px 0 0 0; text-align: center; font-size: 13px; font-weight: bold;">PREMIUM COMPREHENSIVE PRODUCTION WORKSTATION · 至尊全功能版</p>
@@ -124,7 +134,6 @@ style_list = {
     "🎞️ 90年代黑白胶片 (1990s monochrome film style, classic grain)": ", 1990s monochrome film photography, black and white, classic cinematic grain, nostalgic atmosphere, high contrast"
 }
 
-# 【修复点】：彻底去掉了 on_change 强制刷新参数，回归原生平滑操作
 chosen_style = st.selectbox(
     "选择期望追加的视觉艺术风格：", 
     list(style_list.keys())
