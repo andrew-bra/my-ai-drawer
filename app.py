@@ -28,7 +28,7 @@ def get_random_prompt_from_cloud(api_key):
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "gpt-3.5-turbo", # 对应 Codex 官方分组的基础模型
+        "model": "gpt-5.4-mini", # 对应 Codex 官方分组的基础模型
         "messages": [
             {"role": "system", "content": "你是一个顶级的AI绘画提示词专家。"},
             {"role": "user", "content": "请随机生成一条极具画面感、高质量的AI绘图提示词。可以是科幻、奇幻、复古、写实等任意风格。要求：直接输出提示词内容，不要有任何废话，不要带引号，控制在60个字以内，必须是中文。"}
