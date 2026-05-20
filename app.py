@@ -3,56 +3,62 @@ import requests
 import base64
 import os
 import random
-import json
 from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# ==================== 1. 系统级配置与缓存初始化 ====================
+# ==================== 1. 系统级配置与会话缓存初始化 ====================
 st.set_page_config(page_title="智能影像生成控制台", layout="centered")
 
-# 定义本地缓存文件夹
-CACHE_DIR = "image_cache"
-MANIFEST_FILE = os.path.join(CACHE_DIR, "manifest.json")
-
-# 确保缓存目录和索引账本存在
-if not os.path.exists(CACHE_DIR):
-    os.makedirs(CACHE_DIR)
-
-def load_manifest():
-    if os.path.exists(MANIFEST_FILE):
-        try:
-            with open(MANIFEST_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            return []
-    return []
-
-def save_manifest(data):
-    with open(MANIFEST_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-
-def save_asset_to_local(prompt_text, img_bytes, style_label):
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"img_{timestamp}.png"
-    filepath = os.path.join(CACHE_DIR, filename)
-    
-    with open(filepath, "wb") as f:
-        f.write(img_bytes)
-        
-    manifest = load_manifest()
-    new_entry = {
-        "id": timestamp,
-        "filename": filename,
-        "prompt": prompt_text,
-        "style": style_label,
-        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+# 注入 3.0 专属殿堂级暗黑科技 CSS 样式
+st.markdown("""
+<style>
+    .stApp { background-color: #0b0f19 !important; color: #e2e8f0 !important; }
+    .stButton>button {
+        border-radius: 8px !important;
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+        color: #00ecff !important;
+        border: 1px solid rgba(0, 236, 255, 0.2) !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        font-weight: 500 !important;
     }
-    manifest.insert(0, new_entry)
-    save_manifest(manifest)
+    .stButton>button:hover {
+        box-shadow: 0 0 15px rgba(0, 236, 255, 0.6) !important;
+        border-color: #00ecff !important;
+        transform: translateY(-2px);
+        color: #ffffff !important;
+    }
+    div.stButton > button[kind="primary"] {
+        background: linear-gradient(90deg, #00c6ff 0%, #0072ff 100%) !important;
+        color: white !important;
+        border: none !important;
+    }
+    div.stButton > button[kind="primary"]:hover {
+        box-shadow: 0 0 20px rgba(0, 114, 255, 0.8) !important;
+    }
+    .stTextArea textarea, .stTextInput input, .stSelectbox select {
+        background-color: rgba(15, 23, 42, 0.6) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+    }
+    .stTextArea textarea:focus {
+        border-color: #00ecff !important;
+        box-shadow: 0 0 8px rgba(0, 236, 255, 0.3) !important;
+    }
+    .stDetails {
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        background-color: rgba(15, 23, 42, 0.4) !important;
+        border-radius: 8px !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# 初始化状态变量
+# 核心：使用 session_state 进行基于浏览器会话的物理隔离缓存！
+if "history_images" not in st.session_state:
+    st.session_state.history_images = []  # 每个访客都会有一个独立的空列表
+    
 if "current_placeholder" not in st.session_state:
     st.session_state.current_placeholder = "点击下方按钮获取灵感，或在此直接输入您的创意描述..."
 if "is_loading" not in st.session_state:
@@ -60,9 +66,10 @@ if "is_loading" not in st.session_state:
 if "input_text_value" not in st.session_state:
     st.session_state.input_text_value = ""
 
+# 响应历史词回填逻辑
 if st.session_state.input_text_value:
     st.session_state.current_placeholder = st.session_state.input_text_value
-    st.session_state.input_text_value = ""
+    st.session_state.input_text_value = "" # 用完清空
 
 IMAGE_API_KEY = os.getenv("MY_IMAGE_API_KEY")
 CHAT_API_KEY = os.getenv("MY_CHAT_API_KEY")
@@ -134,7 +141,7 @@ with col_btn1:
         st.session_state.is_loading = False
         st.rerun()
 with col_btn2:
-    enable_translate = st.toggle("🌐 开启中译英智能咒语优化引擎", value=True, help="强烈建议开启！用AI把中文大白话进化成电影级英文高级咒语，画质翻倍。")
+    enable_translate = st.toggle("🌐 开启中译英智能咒语优化引擎", value=True)
 
 prompt = st.text_area(
     "核心图像描述 (支持中文及英文):", 
@@ -158,25 +165,17 @@ chosen_style = st.selectbox("选择期望追加的视觉艺术风格：", list(s
 with st.expander("🛠️ 影像精细化渲染高级控制面板", expanded=False):
     col1, col2 = st.columns(2)
     with col1:
-        aspect_ratio = st.selectbox(
-            "📐 图像构图画幅比例：",
-            ["1:1 标准方形 (1024x1024)", "16:9 宽银幕壁纸 (1024x576)", "9:16 移动端海报 (576x1024)"]
-        )
+        aspect_ratio = st.selectbox("📐 图像构图画幅比例：", ["1:1 标准方形 (1024x1024)", "16:9 宽银幕壁纸 (1024x576)", "9:16 移动端海报 (576x1024)"])
     with col2:
         quality = st.selectbox("🎭 影像生成质量：", ["standard (标准影像)", "hd (超清影像增强)"])
         
     negative_prompt = st.text_input("🚫 负向提示词 (排除画面多余元素):", placeholder="例如：变形、低画质、崩坏的肢体、模糊、水印")
     
     st.markdown("---")
-    st.write("🔒 **特征锁定矩阵 (创作连环画/分镜故事核心)：**")
     use_seed = st.checkbox("固定特征种子 (开启后可微调文字进行画面连贯创作)", value=False)
     custom_seed = st.number_input("设置固定的随机种子数值：", min_value=1, max_value=9999999, value=88888)
 
-size_mapping = {
-    "1:1 标准方形 (1024x1024)": "1024x1024",
-    "16:9 宽银幕壁纸 (1024x576)": "1024x576",
-    "9:16 移动端海报 (576x1024)": "576x1024"
-}
+size_mapping = {"1:1 标准方形 (1024x1024)": "1024x1024", "16:9 宽银幕壁纸 (1024x576)": "1024x576", "9:16 移动端海报 (576x1024)": "576x1024"}
 chosen_size = size_mapping[aspect_ratio]
 
 if st.button("开始构建影像 ✨", type="primary"):
@@ -192,7 +191,6 @@ if st.button("开始构建影像 ✨", type="primary"):
                 with st.spinner("🌐 正在将提示词进化为高阶艺术英文咒语..."):
                     final_prompt = translate_and_optimize_prompt(CHAT_API_KEY, final_prompt)
             final_prompt += style_list[chosen_style]
-            st.info(f"🚀 系统分发核心咒语: `{final_prompt[:80]}...`")
 
         with st.spinner("AI 正在解析多维向量并绘制影像，请稍候..."):
             payload = {
@@ -202,10 +200,8 @@ if st.button("开始构建影像 ✨", type="primary"):
                 "size": chosen_size,
                 "quality": quality.split(" ")[0]
             }
-            if negative_prompt:
-                payload["negative_prompt"] = negative_prompt
-            if use_seed:
-                payload["seed"] = custom_seed
+            if negative_prompt: payload["negative_prompt"] = negative_prompt
+            if use_seed: payload["seed"] = custom_seed
                 
             headers = {"Authorization": f"Bearer {IMAGE_API_KEY}", "User-Agent": "Mozilla/5.0"}
             try:
@@ -218,40 +214,38 @@ if st.button("开始构建影像 ✨", type="primary"):
                     st.image(img_bytes, caption="当前生成的影像结果", use_container_width=True)
                     st.download_button("⬇️ 下载当前高清原图", data=img_bytes, file_name="AIGC_Result.png", mime="image/png", type="primary")
                     
-                    # 核心改动：落盘保存
+                    # 绝对隔离策略：存入当前用户的私人浏览器临时内存池中
                     style_label = chosen_style.split(" ")[0] if chosen_style else "✨ 无滤镜"
-                    save_asset_to_local(display_prompt, img_bytes, style_label)
-                    st.rerun() # 立即刷新前端，展示陈列室
+                    unique_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+                    st.session_state.history_images.insert(0, {
+                        "id": unique_id,
+                        "prompt": display_prompt,
+                        "style": style_label,
+                        "bytes": img_bytes
+                    })
                 else:
                     st.error(f"影像构建失败，状态码: {res.status_code} 原因: {res.text}")
             except Exception as e:
                 st.error(f"网络计算节点发生错误: {e}")
 
-# ==================== 6. 本地硬盘持久化展厅与物理删除 ====================
-manifest_data = load_manifest()
-
-if manifest_data:
+# ==================== 6. 专属私密陈列室 (绝对隔离 + 删除功能) ====================
+if st.session_state.history_images:
     st.markdown("---")
-    st.markdown("### 📜 本地硬盘历史创作陈列室")
+    st.markdown("### 📜 您的私密创作陈列室 (本次会话)")
     cols = st.columns(2)
-    for index, item in enumerate(manifest_data):
-        filepath = os.path.join(CACHE_DIR, item["filename"])
-        if os.path.exists(filepath):
-            with cols[index % 2]:
-                # 完美复刻你截图里的UI排版样式
-                st.image(filepath, use_container_width=True)
-                st.caption(f"🎨 [{item.get('style', '未分类')}] {item['prompt'][:18]}...")
-                
-                # 增加精简的删除和回填控制按钮
-                ctrl1, ctrl2 = st.columns(2)
-                with ctrl1:
-                    if st.button("🔄 回填词", key=f"bk_{item['id']}_{index}"):
-                        st.session_state.input_text_value = item["prompt"]
-                        st.rerun()
-                with ctrl2:
-                    if st.button("🗑️ 删除", key=f"dl_{item['id']}_{index}"):
-                        if os.path.exists(filepath):
-                            os.remove(filepath)
-                        updated_manifest = [x for x in manifest_data if x["id"] != item["id"]]
-                        save_manifest(updated_manifest)
-                        st.rerun()
+    for index, item in enumerate(st.session_state.history_images):
+        with cols[index % 2]:
+            st.image(item["bytes"], use_container_width=True)
+            st.caption(f"🎨 [{item['style']}] {item['prompt'][:18]}...")
+            
+            ctrl1, ctrl2 = st.columns(2)
+            with ctrl1:
+                # 提取回填按钮
+                if st.button("🔄 回填", key=f"bk_{item['id']}"):
+                    st.session_state.input_text_value = item["prompt"]
+                    st.rerun()
+            with ctrl2:
+                # 删除按钮：仅从当前访客的私有内存列表中移除
+                if st.button("🗑️ 删除", key=f"dl_{item['id']}"):
+                    st.session_state.history_images = [x for x in st.session_state.history_images if x["id"] != item["id"]]
+                    st.rerun()
