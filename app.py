@@ -3,30 +3,20 @@ import requests
 import base64
 import os
 import random
-from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# ==================== 1. 系统级配置 ====================
+# ==================== 1. 系统级专业配置 ====================
 st.set_page_config(page_title="智能影像生成控制台", layout="centered")
 
-# 核心：使用 session_state 进行私密会话隔离缓存
-if "history_images" not in st.session_state:
-    st.session_state.history_images = []
-    
+# 初始化系统缓存变量（带防重复获取锁）
 if "current_placeholder" not in st.session_state:
     st.session_state.current_placeholder = "点击下方按钮获取灵感，或在此直接输入您的创意描述..."
 if "is_loading" not in st.session_state:
     st.session_state.is_loading = False
-if "input_text_value" not in st.session_state:
-    st.session_state.input_text_value = ""
 
-# 响应历史词回填逻辑
-if st.session_state.input_text_value:
-    st.session_state.current_placeholder = st.session_state.input_text_value
-    st.session_state.input_text_value = ""
-
+# 读取环境变量密码
 IMAGE_API_KEY = os.getenv("MY_IMAGE_API_KEY")
 CHAT_API_KEY = os.getenv("MY_CHAT_API_KEY")
 
@@ -34,10 +24,11 @@ if not IMAGE_API_KEY or not CHAT_API_KEY:
     st.error("系统错误：未检测到完整的 API Key 环境变量，请在 Secrets 中配置双密钥！")
     st.stop()
 
+# 核心接口地址
 URL_GEN = "https://nowcoding.ai/v1/images/generations"
 URL_CHAT = "https://nowcoding.ai/v1/chat/completions"
 
-# ==================== 2. 核心大模型工具函数 ====================
+# ==================== 2. 大模型工具函数 ====================
 def get_random_prompt_from_cloud(api_key):
     themes = [
         "古代国风水墨（如：侠客、竹林、红灯笼、泼墨山水、写意意境）",
@@ -49,23 +40,32 @@ def get_random_prompt_from_cloud(api_key):
     ]
     chosen_theme = random.choice(themes)
 
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
     payload = {
         "model": "gpt-5.4-mini",
         "messages": [
             {"role": "system", "content": "你是一个充满想象力的顶级AI绘画提示词专家。"},
-            {"role": "user", "content": f"请为我定制一条极具画面感、高质量的AI绘图提示词。今天指定的硬性主题是：【{chosen_theme}】。要求：必须严格围绕这个主题发挥，绝对不准出现任何赛博朋克、机甲、科幻、未来的元素！直接输出提示词内容，不要有任何废话解释，控制在60个字以内，必须是中文。"}
+            {"role": "user", "content": f"请为我定制一条极具画面感、高质量的AI绘图提示词。今天指定的硬性主题是：【{chosen_theme}】。要求：必须严格围绕这个主题发挥，绝对不准出现任何赛博朋克、机甲、科幻、未来的元素！直接输出提示词内容，绝对不要有任何废话解释，控制在60个字以内，必须是中文。"}
         ],
         "temperature": 1.0
     }
     try:
         res = requests.post(URL_CHAT, headers=headers, json=payload, timeout=10)
-        return res.json()["choices"][0]["message"]["content"].strip() if res.status_code == 200 else "灵感检索失败"
+        if res.status_code == 200:
+            return res.json()["choices"][0]["message"]["content"].strip()
+        else:
+            return f"抽卡失败，状态码 {res.status_code}"
     except:
-        return "服务器连接超时"
+        return "本地网络连接超时，请重试"
 
 def translate_and_optimize_prompt(api_key, user_prompt):
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
     payload = {
         "model": "gpt-5.4-mini",
         "messages": [
@@ -75,22 +75,25 @@ def translate_and_optimize_prompt(api_key, user_prompt):
         "temperature": 0.7
     }
     try:
+        requests.packages.urllib3.disable_warnings()
         res = requests.post(URL_CHAT, headers=headers, json=payload, timeout=10)
-        return res.json()["choices"][0]["message"]["content"].strip() if res.status_code == 200 else user_prompt
+        if res.status_code == 200:
+            return res.json()["choices"][0]["message"]["content"].strip()
+        return user_prompt
     except:
         return user_prompt
 
-# ==================== 3. 页面视觉与交互 ====================
-# 仅保留干净的顶部横幅，去掉全局花哨CSS
+# ==================== 3. 经典至尊版原生 UI 排版 ====================
 st.markdown("""
 <div style="background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%); padding: 22px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
     <h2 style="color: white; margin: 0; text-align: center; font-family: Arial; letter-spacing: 2px;">AIGC 智能影像生成控制台</h2>
-    <p style="color: #e0e0e0; margin: 5px 0 0 0; text-align: center; font-size: 13px; font-weight: bold;">PREMIUM COMPREHENSIVE PRODUCTION WORKSTATION · 至尊全功能版</p>
+    <p style="color: #00ecff; margin: 5px 0 0 0; text-align: center; font-size: 13px; font-weight: bold;">PREMIUM COMPREHENSIVE PRODUCTION WORKSTATION · 至尊全功能版</p>
 </div>
 """, unsafe_allow_html=True)
 
 col_btn1, col_btn2 = st.columns([1, 1])
 with col_btn1:
+    # 带有防重复触发锁定机制的按钮
     if st.button("🎲 获取随机灵感创意", disabled=st.session_state.is_loading, use_container_width=True):
         st.session_state.is_loading = True
         with st.spinner("📊 正在检索创意数据库并构建核心提示词..."):
@@ -98,7 +101,7 @@ with col_btn1:
         st.session_state.is_loading = False
         st.rerun()
 with col_btn2:
-    enable_translate = st.toggle("🌐 开启中译英智能咒语优化引擎", value=True)
+    enable_translate = st.toggle("🌐 开启中译英智能咒语优化引擎", value=True, help="用AI把中文大白话进化成电影级英文高级咒语，画质翻倍。")
 
 prompt = st.text_area(
     "核心图像描述 (支持中文及英文):", 
@@ -119,35 +122,45 @@ style_list = {
 }
 chosen_style = st.selectbox("选择期望追加的视觉艺术风格：", list(style_list.keys()))
 
-with st.expander("🛠️ 影像精细化渲染高级控制面板", expanded=False):
+# ==================== 4. 高级隐藏配置面板 ====================
+# 【修复点】：去除了 expanded=False 参数，将状态管理完全交给浏览器前端，彻底解决黏滞弹开Bug
+with st.expander("🛠️ 影像精细化渲染高级控制面板"):
     col1, col2 = st.columns(2)
     with col1:
-        aspect_ratio = st.selectbox("📐 图像构图画幅比例：", ["1:1 标准方形 (1024x1024)", "16:9 宽银幕壁纸 (1024x576)", "9:16 移动端海报 (576x1024)"])
+        aspect_ratio = st.selectbox(
+            "📐 图像构图画幅比例：",
+            ["1:1 标准方形 (1024x1024)", "16:9 宽银幕壁纸 (1024x576)", "9:16 移动端海报 (576x1024)"]
+        )
     with col2:
         quality = st.selectbox("🎭 影像生成质量：", ["standard (标准影像)", "hd (超清影像增强)"])
         
     negative_prompt = st.text_input("🚫 负向提示词 (排除画面多余元素):", placeholder="例如：变形、低画质、崩坏的肢体、模糊、水印")
     
     st.markdown("---")
+    st.write("🔒 **特征锁定矩阵 (创作连环画/分镜故事核心)：**")
     use_seed = st.checkbox("固定特征种子 (开启后可微调文字进行画面连贯创作)", value=False)
     custom_seed = st.number_input("设置固定的随机种子数值：", min_value=1, max_value=9999999, value=88888)
 
-size_mapping = {"1:1 标准方形 (1024x1024)": "1024x1024", "16:9 宽银幕壁纸 (1024x576)": "1024x576", "9:16 移动端海报 (576x1024)": "576x1024"}
+size_mapping = {
+    "1:1 标准方形 (1024x1024)": "1024x1024",
+    "16:9 宽银幕壁纸 (1024x576)": "1024x576",
+    "9:16 移动端海报 (576x1024)": "576x1024"
+}
 chosen_size = size_mapping[aspect_ratio]
 
+# ==================== 5. 影像异步构建 ====================
 if st.button("开始构建影像 ✨", type="primary"):
     final_prompt = prompt if prompt else (None if st.session_state.current_placeholder.startswith("点击下方按钮") else st.session_state.current_placeholder)
     
     if not final_prompt:
         st.warning("系统提示：检测到当前输入内容为空，请填写描述词或获取灵感！")
     else:
-        display_prompt = final_prompt
-        
         with st.spinner("AI 正在执行底层逻辑运算，请稍候..."):
             if enable_translate:
                 with st.spinner("🌐 正在将提示词进化为高阶艺术英文咒语..."):
                     final_prompt = translate_and_optimize_prompt(CHAT_API_KEY, final_prompt)
             final_prompt += style_list[chosen_style]
+            st.info(f"🚀 系统分发核心咒语: `{final_prompt[:80]}...`")
 
         with st.spinner("AI 正在解析多维向量并绘制影像，请稍候..."):
             payload = {
@@ -157,10 +170,15 @@ if st.button("开始构建影像 ✨", type="primary"):
                 "size": chosen_size,
                 "quality": quality.split(" ")[0]
             }
-            if negative_prompt: payload["negative_prompt"] = negative_prompt
-            if use_seed: payload["seed"] = custom_seed
+            if negative_prompt:
+                payload["negative_prompt"] = negative_prompt
+            if use_seed:
+                payload["seed"] = custom_seed
                 
-            headers = {"Authorization": f"Bearer {IMAGE_API_KEY}", "User-Agent": "Mozilla/5.0"}
+            headers = {
+                "Authorization": f"Bearer {IMAGE_API_KEY}",
+                "User-Agent": "Mozilla/5.0"
+            }
             try:
                 res = requests.post(URL_GEN, headers=headers, json=payload)
                 if res.status_code == 200:
@@ -170,37 +188,7 @@ if st.button("开始构建影像 ✨", type="primary"):
                     st.success("✨ 核心影像构建完成！")
                     st.image(img_bytes, caption="当前生成的影像结果", use_container_width=True)
                     st.download_button("⬇️ 下载当前高清原图", data=img_bytes, file_name="AIGC_Result.png", mime="image/png", type="primary")
-                    
-                    # 绝对隔离策略：存入当前访客的私人会话内存
-                    style_label = chosen_style.split(" ")[0] if chosen_style else "✨ 无滤镜"
-                    unique_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
-                    st.session_state.history_images.insert(0, {
-                        "id": unique_id,
-                        "prompt": display_prompt,
-                        "style": style_label,
-                        "bytes": img_bytes
-                    })
                 else:
                     st.error(f"影像构建失败，状态码: {res.status_code} 原因: {res.text}")
             except Exception as e:
                 st.error(f"网络计算节点发生错误: {e}")
-
-# ==================== 6. 专属私密陈列室 ====================
-if st.session_state.history_images:
-    st.markdown("---")
-    st.markdown("### 📜 您的私密创作陈列室 (离开网页自动销毁)")
-    cols = st.columns(2)
-    for index, item in enumerate(st.session_state.history_images):
-        with cols[index % 2]:
-            st.image(item["bytes"], use_container_width=True)
-            st.caption(f"🎨 [{item['style']}] {item['prompt'][:18]}...")
-            
-            ctrl1, ctrl2 = st.columns(2)
-            with ctrl1:
-                if st.button("🔄 回填", key=f"bk_{item['id']}"):
-                    st.session_state.input_text_value = item["prompt"]
-                    st.rerun()
-            with ctrl2:
-                if st.button("🗑️ 删除", key=f"dl_{item['id']}"):
-                    st.session_state.history_images = [x for x in st.session_state.history_images if x["id"] != item["id"]]
-                    st.rerun()
