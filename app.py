@@ -88,7 +88,7 @@ def translate_and_optimize_prompt(api_key, user_prompt):
         return user_prompt
 
 # ==================== 3. 经典至尊版原生 UI 排版 ====================
-# 【修复点】：在这里加入了隐藏顶部菜单和底部水印的专属 CSS 样式
+# 【修复点】：增加 .stAppDeployButton {display: none;} 彻底隐藏 Manage app 按钮
 st.markdown("""
 <style>
     /* 彻底隐藏右上角的汉堡菜单 (包含 Rerun, Settings 等) */
@@ -97,6 +97,8 @@ st.markdown("""
     header {visibility: hidden;}
     /* 彻底隐藏底部的 Made with Streamlit 水印 */
     footer {visibility: hidden;}
+    /* 彻底隐藏右下角的 Manage app (管理应用) 悬浮按钮 */
+    .stAppDeployButton {display: none;}
 </style>
 
 <div style="background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%); padding: 22px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
