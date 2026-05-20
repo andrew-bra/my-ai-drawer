@@ -88,7 +88,7 @@ def translate_and_optimize_prompt(api_key, user_prompt):
         return user_prompt
 
 # ==================== 3. 经典至尊版原生 UI 排版 ====================
-# 【修复点】：增加 .stAppDeployButton {display: none;} 彻底隐藏 Manage app 按钮
+# 【组件隐藏核心】：一次性抹除所有不需要的系统挂件
 st.markdown("""
 <style>
     /* 彻底隐藏右上角的汉堡菜单 (包含 Rerun, Settings 等) */
