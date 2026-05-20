@@ -8,56 +8,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ==================== 1. 系统级配置与会话缓存初始化 ====================
+# ==================== 1. 系统级配置 ====================
 st.set_page_config(page_title="智能影像生成控制台", layout="centered")
 
-# 注入 3.0 专属殿堂级暗黑科技 CSS 样式
-st.markdown("""
-<style>
-    .stApp { background-color: #0b0f19 !important; color: #e2e8f0 !important; }
-    .stButton>button {
-        border-radius: 8px !important;
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
-        color: #00ecff !important;
-        border: 1px solid rgba(0, 236, 255, 0.2) !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        font-weight: 500 !important;
-    }
-    .stButton>button:hover {
-        box-shadow: 0 0 15px rgba(0, 236, 255, 0.6) !important;
-        border-color: #00ecff !important;
-        transform: translateY(-2px);
-        color: #ffffff !important;
-    }
-    div.stButton > button[kind="primary"] {
-        background: linear-gradient(90deg, #00c6ff 0%, #0072ff 100%) !important;
-        color: white !important;
-        border: none !important;
-    }
-    div.stButton > button[kind="primary"]:hover {
-        box-shadow: 0 0 20px rgba(0, 114, 255, 0.8) !important;
-    }
-    .stTextArea textarea, .stTextInput input, .stSelectbox select {
-        background-color: rgba(15, 23, 42, 0.6) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        color: #ffffff !important;
-        border-radius: 8px !important;
-    }
-    .stTextArea textarea:focus {
-        border-color: #00ecff !important;
-        box-shadow: 0 0 8px rgba(0, 236, 255, 0.3) !important;
-    }
-    .stDetails {
-        border: 1px solid rgba(255, 255, 255, 0.05) !important;
-        background-color: rgba(15, 23, 42, 0.4) !important;
-        border-radius: 8px !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# 核心：使用 session_state 进行基于浏览器会话的物理隔离缓存！
+# 核心：使用 session_state 进行私密会话隔离缓存
 if "history_images" not in st.session_state:
-    st.session_state.history_images = []  # 每个访客都会有一个独立的空列表
+    st.session_state.history_images = []
     
 if "current_placeholder" not in st.session_state:
     st.session_state.current_placeholder = "点击下方按钮获取灵感，或在此直接输入您的创意描述..."
@@ -69,7 +25,7 @@ if "input_text_value" not in st.session_state:
 # 响应历史词回填逻辑
 if st.session_state.input_text_value:
     st.session_state.current_placeholder = st.session_state.input_text_value
-    st.session_state.input_text_value = "" # 用完清空
+    st.session_state.input_text_value = ""
 
 IMAGE_API_KEY = os.getenv("MY_IMAGE_API_KEY")
 CHAT_API_KEY = os.getenv("MY_CHAT_API_KEY")
@@ -124,11 +80,12 @@ def translate_and_optimize_prompt(api_key, user_prompt):
     except:
         return user_prompt
 
-# ==================== 3. 经典至尊版 UI ====================
+# ==================== 3. 页面视觉与交互 ====================
+# 仅保留干净的顶部横幅，去掉全局花哨CSS
 st.markdown("""
-<div style="background: linear-gradient(90deg, #0f2027 0%, #203a43 50%, #2c5364 100%); padding: 22px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+<div style="background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%); padding: 22px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
     <h2 style="color: white; margin: 0; text-align: center; font-family: Arial; letter-spacing: 2px;">AIGC 智能影像生成控制台</h2>
-    <p style="color: #00ecff; margin: 5px 0 0 0; text-align: center; font-size: 13px; font-weight: bold;">PREMIUM COMPREHENSIVE PRODUCTION WORKSTATION · 至尊全功能版</p>
+    <p style="color: #e0e0e0; margin: 5px 0 0 0; text-align: center; font-size: 13px; font-weight: bold;">PREMIUM COMPREHENSIVE PRODUCTION WORKSTATION · 至尊全功能版</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -214,7 +171,7 @@ if st.button("开始构建影像 ✨", type="primary"):
                     st.image(img_bytes, caption="当前生成的影像结果", use_container_width=True)
                     st.download_button("⬇️ 下载当前高清原图", data=img_bytes, file_name="AIGC_Result.png", mime="image/png", type="primary")
                     
-                    # 绝对隔离策略：存入当前用户的私人浏览器临时内存池中
+                    # 绝对隔离策略：存入当前访客的私人会话内存
                     style_label = chosen_style.split(" ")[0] if chosen_style else "✨ 无滤镜"
                     unique_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
                     st.session_state.history_images.insert(0, {
@@ -228,10 +185,10 @@ if st.button("开始构建影像 ✨", type="primary"):
             except Exception as e:
                 st.error(f"网络计算节点发生错误: {e}")
 
-# ==================== 6. 专属私密陈列室 (绝对隔离 + 删除功能) ====================
+# ==================== 6. 专属私密陈列室 ====================
 if st.session_state.history_images:
     st.markdown("---")
-    st.markdown("### 📜 您的私密创作陈列室 (本次会话)")
+    st.markdown("### 📜 您的私密创作陈列室 (离开网页自动销毁)")
     cols = st.columns(2)
     for index, item in enumerate(st.session_state.history_images):
         with cols[index % 2]:
@@ -240,12 +197,10 @@ if st.session_state.history_images:
             
             ctrl1, ctrl2 = st.columns(2)
             with ctrl1:
-                # 提取回填按钮
                 if st.button("🔄 回填", key=f"bk_{item['id']}"):
                     st.session_state.input_text_value = item["prompt"]
                     st.rerun()
             with ctrl2:
-                # 删除按钮：仅从当前访客的私有内存列表中移除
                 if st.button("🗑️ 删除", key=f"dl_{item['id']}"):
                     st.session_state.history_images = [x for x in st.session_state.history_images if x["id"] != item["id"]]
                     st.rerun()
