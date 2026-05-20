@@ -1,9 +1,4 @@
 import streamlit as st
-# 绝杀补丁：强行修复最新版 Streamlit 与画板插件的冲突
-import streamlit.components.v1 as components
-if not hasattr(st, 'image'):
-    import streamlit.elements.image as st_image
-    st.image = st_image.image
 import requests
 import base64
 import os
