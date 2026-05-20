@@ -53,12 +53,13 @@ if mode == "✨ 纯文字生图":
 elif mode == "🖌️ 智能P图（局部重绘）":
     URL_EDIT = "https://api.nowcoding.ai/v1/images/edits"
     
-    st.markdown("### 💡 使用说明：\n1. 上传一张 **PNG 格式** 的正方形图片（最好是 1024x1024）。\n2. 用鼠标在右侧画板上**涂抹**需要修改/删掉的区域。\n3. 在下方输入咒语，告诉 AI 你想把涂抹区域改成什么。")
+    st.markdown("### 💡 使用说明：\n1. 上传一张任意格式的图片（**支持 PNG, JPG, JPEG**）。\n2. 用鼠标在右侧画板上**涂抹**需要修改/删掉的区域。\n3. 在下方输入咒语，告诉 AI 你想把涂抹区域改成什么。")
     
-    uploaded_file = st.file_uploader("第一步：上传待修改的 PNG 图片", type=["png"])
+    # 核心改动：type 增加了 jpg 和 jpeg
+    uploaded_file = st.file_uploader("第一步：上传待修改的图片", type=["png", "jpg", "jpeg"])
     
     if uploaded_file:
-        # 打开并统一缩放到 512x512 方便网页涂抹
+        # 核心改动：不管用户传什么，强行转换为带有透明通道的 RGBA 格式并缩放
         bg_image = Image.open(uploaded_file).convert("RGBA").resize((512, 512))
         
         st.write("第二步：请在下方图片上用鼠标【涂抹】需要修改的地方：")
@@ -86,16 +87,16 @@ elif mode == "🖌️ 智能P图（局部重绘）":
             else:
                 with st.spinner("AI 正在施展变身术，请稍候..."):
                     try:
-                        # 1. 准备原图数据包
+                        # 1. 准备原图数据包（统一导出为 AI 强制要求的 PNG 格式）
                         img_buffer = BytesIO()
                         bg_image.resize((1024, 1024)).save(img_buffer, format="PNG")
                         img_buffer.seek(0)
                         
-                        # 2. 准备蒙版数据包（将用户涂抹转换为 OpenAI 认可的透明蒙版）
-                        mask_data = canvas_result.image_data  # 拿到涂抹图层
+                        # 2. 准备蒙版数据包
+                        mask_data = canvas_result.image_data  
                         mask_image = Image.fromarray(mask_data.astype('uint8'), 'RGBA')
                         
-                        # 核心算法：反转透明度。没涂的地方全透明，涂了的地方不透明
+                        # 反转透明度算法
                         r, g, b, a = mask_image.split()
                         final_mask = Image.merge("RGBA", (r, g, b, r)) 
                         
@@ -103,19 +104,18 @@ elif mode == "🖌️ 智能P图（局部重绘）":
                         final_mask.resize((1024, 1024)).save(mask_buffer, format="PNG")
                         mask_buffer.seek(0)
                         
-                        # 3. 发送给新中转商的多张图片表单请求
+                        # 3. 发送给新中转商的表单请求
                         files = {
                             "image": ("image.png", img_buffer, "image/png"),
                             "mask": ("mask.png", mask_buffer, "image/png"),
                         }
                         data = {
-                            "model": "gpt-image-2", # 如果报错请改为 dall-e-2，部分中转商 P图只支持 dall-e-2
+                            "model": "gpt-image-2", 
                             "prompt": edit_prompt,
                             "n": 1,
                             "size": "1024x1024"
                         }
                         
-                        # 移除 json 传输，改用 files 传图表单
                         edit_headers = {"Authorization": f"Bearer {API_KEY}"}
                         res = requests.post(URL_EDIT, headers=edit_headers, files=files, data=data)
                         
