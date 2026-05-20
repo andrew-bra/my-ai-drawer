@@ -23,18 +23,32 @@ URL_CHAT = "https://nowcoding.ai/v1/chat/completions"
 
 # ==================== 使用“聊天密钥”获取灵感 ====================
 def get_random_prompt_from_cloud(api_key):
+    import random # 确保函数里能用随机数
+    
+    # 1. 强行在本地挑出一个风格主题，直接砸给AI，不让它自己选
+    themes = [
+        "古代国风水墨（如：侠客、竹林、红灯笼、泼墨山水）",
+        "大自然与写实摄影（如：微距露珠、深海鲸鱼、森林晨光、高清产品照）",
+        "欧洲魔幻奇幻（如：独角兽、中世纪骑士、神秘城堡、飞龙翱翔）",
+        "复古温馨胶片（如：90年代老街、温馨午后、怀旧照、颗粒感）",
+        "童话治愈插画（如：小巧可爱的Pip、魔法森林、梦幻绘本风格）",
+        "野生动物史诗（如：远古巨兽、雪原狼群、雄鹰展翅、震撼构图）"
+    ]
+    chosen_theme = random.choice(themes) # 每次点击，Python会在后台盲盒抽一个风格
+
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "gpt-5.3-codex", # 对应 Codex 官方分组的基础模型
+        "model": "gpt-5.3-codex",
         "messages": [
-            {"role": "system", "content": "你是一个顶级的AI绘画提示词专家。"},
-            {"role": "user", "content": "请随机生成一条极具画面感、高质量的AI绘图提示词。【严厉要求】：1. 每次必须从以下元素中**随机抽取1-2个元素**作为主体，绝对不能重复：- 动物类（如：猫咪、哈士奇、机械战狼、独角兽、远古巨兽、深海鲸鱼）- 人物类（如：赛博朋克黑客、中世纪骑士、古风刺客、宇航员、未来机甲少女）- 场景静物类（如：废土世界、天空之城、微距水滴、深邃星空、蒸汽朋克工厂、老电影一角2. 风格要在以下类型中随机：科幻、奇幻、国风水墨、复古胶片、超现实主义、写实摄影。3. 必须包含画面细节、光影效果（如丁达尔效应、逆光、霓虹反光）。4. 直接输出提示词内容，绝对不要有任何废话解释，不要带引号，控制在60个字以内，必须是中文。"}
+            {"role": "system", "content": "你是一个充满想象力的顶级AI绘画提示词专家。"},
+            {"role": "user", "content": f"请为我定制一条极具画面感、高质量的AI绘图提示词。今天指定的硬性主题是：【{chosen_theme}】。要求：必须严格围绕这个主题发挥，绝对不准出现任何赛博朋克、机甲、科幻、未来的元素！直接输出提示词内容，不要有任何废话解释，控制在60个字以内，必须是中文。"}
         ],
-        "temperature": 0.9
+        "temperature": 1.0
     }
+
     try:
         res = requests.post(URL_CHAT, headers=headers, json=payload, timeout=10)
         if res.status_code == 200:
