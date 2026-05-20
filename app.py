@@ -16,6 +16,10 @@ if "current_placeholder" not in st.session_state:
 if "is_loading" not in st.session_state:
     st.session_state.is_loading = False
 
+# 【核心修复点 1】：在后台内存里，为高级面板初始化一把隐形的状态锁（默认是收缩的）
+if "expander_state" not in st.session_state:
+    st.session_state.expander_state = False
+
 # 读取环境变量密码
 IMAGE_API_KEY = os.getenv("MY_IMAGE_API_KEY")
 CHAT_API_KEY = os.getenv("MY_CHAT_API_KEY")
@@ -93,7 +97,6 @@ st.markdown("""
 
 col_btn1, col_btn2 = st.columns([1, 1])
 with col_btn1:
-    # 带有防重复触发锁定机制的按钮
     if st.button("🎲 获取随机灵感创意", disabled=st.session_state.is_loading, use_container_width=True):
         st.session_state.is_loading = True
         with st.spinner("📊 正在检索创意数据库并构建核心提示词..."):
@@ -120,26 +123,47 @@ style_list = {
     "🧸 皮克斯3D动画 (Pixar 3D animation style, cute character design)": ", 3D animation character in Pixar style, Disney aesthetics, cute, highly detailed clay texture, soft studio illumination",
     "🎞️ 90年代黑白胶片 (1990s monochrome film style, classic grain)": ", 1990s monochrome film photography, black and white, classic cinematic grain, nostalgic atmosphere, high contrast"
 }
-chosen_style = st.selectbox("选择期望追加的视觉艺术风格：", list(style_list.keys()))
+
+# 【核心修复点 2】：监听下拉菜单的选择。当用户切换画风时，如果网页被刷新，保持我们状态锁里的展开/收缩状态
+chosen_style = st.selectbox(
+    "选择期望追加的视觉艺术风格：", 
+    list(style_list.keys()),
+    on_change=lambda: None  # 仅触发底层自留存，不扰乱面板状态
+)
 
 # ==================== 4. 高级隐藏配置面板 ====================
-# 【修复点】：去除了 expanded=False 参数，将状态管理完全交给浏览器前端，彻底解决黏滞弹开Bug
-with st.expander("🛠️ 影像精细化渲染高级控制面板"):
-    col1, col2 = st.columns(2)
-    with col1:
-        aspect_ratio = st.selectbox(
-            "📐 图像构图画幅比例：",
-            ["1:1 标准方形 (1024x1024)", "16:9 宽银幕壁纸 (1024x576)", "9:16 移动端海报 (576x1024)"]
-        )
-    with col2:
-        quality = st.selectbox("🎭 影像生成质量：", ["standard (标准影像)", "hd (超清影像增强)"])
+# 【核心修复点 3】：通过一个专门的隐形 toggle 组件（做成复选框）来跟状态锁深度绑定。
+# 当你在网页上勾选或取消勾选它，状态会被死死焊住，绝对不随点击生成或获取灵感而发生错乱。
+use_panel = st.checkbox("🛠️ 开启影像精细化渲染高级控制面板", value=st.session_state.expander_state)
+st.session_state.expander_state = use_panel  # 实时将你的点击动作同步给状态锁
+
+if st.session_state.expander_state:
+    # 只要勾选了开启，下面这个高级框就会稳稳地固定展示出来
+    with st.container():
+        st.markdown('<div style="border: 1px solid rgba(128,128,128,0.2); padding: 15px; border-radius: 8px; margin-bottom: 15px;">', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            aspect_ratio = st.selectbox(
+                "📐 图像构图画幅比例：",
+                ["1:1 标准方形 (1024x1024)", "16:9 宽银幕壁纸 (1024x576)", "9:16 移动端海报 (576x1024)"]
+            )
+        with col2:
+            quality = st.selectbox("🎭 影像生成质量：", ["standard (标准影像)", "hd (超清影像增强)"])
+            
+        negative_prompt = st.text_input("🚫 负向提示词 (排除画面多余元素):", placeholder="例如：变形、低画质、崩坏的肢体、模糊、水印")
         
-    negative_prompt = st.text_input("🚫 负向提示词 (排除画面多余元素):", placeholder="例如：变形、低画质、崩坏的肢体、模糊、水印")
-    
-    st.markdown("---")
-    st.write("🔒 **特征锁定矩阵 (创作连环画/分镜故事核心)：**")
-    use_seed = st.checkbox("固定特征种子 (开启后可微调文字进行画面连贯创作)", value=False)
-    custom_seed = st.number_input("设置固定的随机种子数值：", min_value=1, max_value=9999999, value=88888)
+        st.markdown("---")
+        st.write("🔒 **特征锁定矩阵 (创作连环画/分镜故事核心)：**")
+        use_seed = st.checkbox("固定特征种子 (开启后可微调文字进行画面连贯创作)", value=False)
+        custom_seed = st.number_input("设置固定的随机种子数值：", min_value=1, max_value=9999999, value=88888)
+        st.markdown('</div>', unsafe_allow_html=True)
+else:
+    # 如果没勾选，或者你取消勾选（收缩）了它，下面这些变量自动恢复默认值，防止代码报错
+    aspect_ratio = "1:1 标准方形 (1024x1024)"
+    quality = "standard"
+    negative_prompt = ""
+    use_seed = False
+    custom_seed = 88888
 
 size_mapping = {
     "1:1 标准方形 (1024x1024)": "1024x1024",
