@@ -7,76 +7,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ==================== 1. 系统级配置与暗黑全局美化 ====================
-st.set_page_config(page_title="AIGC 智能影像生成终端", layout="centered")
+# ==================== 1. 系统级专业配置 ====================
+st.set_page_config(page_title="智能影像生成控制台", layout="centered")
 
-# 注入殿堂级暗黑科技 CSS 样式
-st.markdown("""
-<style>
-    /* 全局暗黑背景微调 */
-    .stApp {
-        background-color: #0b0f19 !important;
-        color: #e2e8f0 !important;
-    }
-    /* 按钮高级霓虹发光与悬浮动效 */
-    .stButton>button {
-        border-radius: 8px !important;
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
-        color: #00ecff !important;
-        border: 1px solid rgba(0, 236, 255, 0.2) !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        font-weight: 500 !important;
-    }
-    .stButton>button:hover {
-        box-shadow: 0 0 15px rgba(0, 236, 255, 0.6) !important;
-        border-color: #00ecff !important;
-        transform: translateY(-2px);
-        color: #ffffff !important;
-    }
-    /* 主要提交按钮高亮 */
-    div.stButton > button[kind="primary"] {
-        background: linear-gradient(90deg, #00c6ff 0%, #0072ff 100%) !important;
-        color: white !important;
-        border: none !important;
-    }
-    div.stButton > button[kind="primary"]:hover {
-        box-shadow: 0 0 20px rgba(0, 114, 255, 0.8) !important;
-    }
-    /* 输入框毛玻璃质感 */
-    .stTextArea textarea, .stTextInput input, .stSelectbox cubic-bezier {
-        background-color: rgba(15, 23, 42, 0.6) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        color: #ffffff !important;
-        border-radius: 8px !important;
-    }
-    .stTextArea textarea:focus {
-        border-color: #00ecff !important;
-        box-shadow: 0 0 8px rgba(0, 236, 255, 0.3) !important;
-    }
-    /* 折叠面板美化 */
-    .stDetails {
-        border: 1px solid rgba(255, 255, 255, 0.05) !important;
-        background-color: rgba(15, 23, 42, 0.4) !important;
-        border-radius: 8px !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# 初始化系统级状态变量
+# 初始化系统缓存变量
 if "current_placeholder" not in st.session_state:
-    st.session_state.current_placeholder = "请输入创意描述..."
+    st.session_state.current_placeholder = "点击下方按钮获取灵感，或在此直接输入您的创意描述..."
 if "is_loading" not in st.session_state:
     st.session_state.is_loading = False
 if "history_images" not in st.session_state:
     st.session_state.history_images = []
-if "input_text_value" not in st.session_state:
-    st.session_state.input_text_value = ""
 
-# 响应历史词回填逻辑
-if st.session_state.input_text_value:
-    st.session_state.current_placeholder = st.session_state.input_text_value
-    st.session_state.input_text_value = "" # 用完清空
-
+# 读取环境变量密码
 IMAGE_API_KEY = os.getenv("MY_IMAGE_API_KEY")
 CHAT_API_KEY = os.getenv("MY_CHAT_API_KEY")
 
@@ -89,6 +31,7 @@ URL_CHAT = "https://nowcoding.ai/v1/chat/completions"
 
 # ==================== 2. 核心大模型工具函数 ====================
 
+# 函数 A：获取反赛博随机灵感
 def get_random_prompt_from_cloud(api_key):
     themes = [
         "古代国风水墨（如：侠客、竹林、红灯笼、泼墨山水、写意意境）",
@@ -99,6 +42,7 @@ def get_random_prompt_from_cloud(api_key):
         "野生动物史诗（如：远古巨兽、雪原狼群、雄鹰展翅、震撼构图、纤毫毕现）"
     ]
     chosen_theme = random.choice(themes)
+
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
         "model": "gpt-5.3-codex",
@@ -114,6 +58,7 @@ def get_random_prompt_from_cloud(api_key):
     except:
         return "服务器连接超时"
 
+# 函数 B：智能中译英与咒语优化引擎
 def translate_and_optimize_prompt(api_key, user_prompt):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
@@ -130,173 +75,130 @@ def translate_and_optimize_prompt(api_key, user_prompt):
     except:
         return user_prompt
 
-# 单张图片核心请求包装
-def send_image_request(payload_data):
-    headers = {"Authorization": f"Bearer {IMAGE_API_KEY}", "User-Agent": "Mozilla/5.0"}
-    try:
-        res = requests.post(URL_GEN, headers=headers, json=payload_data)
-        if res.status_code == 200:
-            return base64.b64decode(res.json()["data"][0]["b64_json"])
-    except:
-        pass
-    return None
-
-# ==================== 3. 页面视觉大横幅 ====================
+# ==================== 3. 视觉美化：科技感大横幅 ====================
 st.markdown("""
-<div style="background: linear-gradient(90deg, #020617 0%, #1e1b4b 50%, #030712 100%); padding: 25px; border-radius: 12px; margin-bottom: 25px; border: 1px solid rgba(99, 102, 241, 0.2); box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-    <h2 style="color: #ffffff; margin: 0; text-align: center; font-family: 'Segoe UI', Arial; letter-spacing: 3px; font-weight: 700;">ART COGNITION TERMINAL</h2>
-    <p style="color: #00ecff; margin: 6px 0 0 0; text-align: center; font-size: 13px; font-weight: 600; letter-spacing: 1px;">智能艺术协同终端 · 3.0 终极至尊版</p>
+<div style="background: linear-gradient(90deg, #0f2027 0%, #203a43 50%, #2c5364 100%); padding: 22px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+    <h2 style="color: white; margin: 0; text-align: center; font-family: Arial; letter-spacing: 2px;">AIGC 智能影像生成控制台</h2>
+    <p style="color: #00ecff; margin: 5px 0 0 0; text-align: center; font-size: 13px; font-weight: bold;">PREMIUM COMPREHENSIVE PRODUCTION WORKSTATION · 至尊全功能版</p>
 </div>
 """, unsafe_allow_html=True)
 
-# ==================== 4. 核心控制组件区 ====================
-col_btn1, col_btn2 = st.columns(2)
+# ==================== 4. 核心输入与控制区 ====================
+col_btn1, col_btn2 = st.columns([1, 1])
 with col_btn1:
-    if st.button("🎲 从云端库抓取随机灵感", disabled=st.session_state.is_loading, use_container_width=True):
+    if st.button("🎲 获取随机灵感创意", disabled=st.session_state.is_loading, use_container_width=True):
         st.session_state.is_loading = True
-        with st.spinner("📊 正在解算分布式灵感网络..."):
+        with st.spinner("📊 正在检索创意数据库并构建核心提示词..."):
             st.session_state.current_placeholder = get_random_prompt_from_cloud(CHAT_API_KEY)
         st.session_state.is_loading = False
         st.rerun()
 with col_btn2:
-    enable_translate = st.toggle("🌐 激活中译英咒语优化引擎", value=True)
+    # 智能翻译引擎开关
+    enable_translate = st.toggle("🌐 开启中译英智能咒语优化引擎", value=True, help="强烈建议开启！用AI把中文大白话进化成电影级英文高级咒语，画质翻倍。")
 
-# 🧩 功能一：快捷拼接矩阵（Prompt Builder）
-st.write("🧩 **词穷拯救者 · 核心快捷修饰标签 (点击快速追加):**")
-tag_cols = st.columns(4)
-added_tags = ""
-with tag_cols[0]:
-    if st.button("🌅 丁达尔神光", use_container_width=True): added_tags += ", tyndall effect, volumetric lighting"
-    if st.button("🔮 虚幻引擎5", use_container_width=True): added_tags += ", unreal engine 5 render"
-with tag_cols[1]:
-    if st.button("💥 极致细节", use_container_width=True): added_tags += ", hyper-detailed, 8k resolution"
-    if st.button("📸 100mm微距", use_container_width=True): added_tags += ", 100mm macro lens photography"
-with tag_cols[2]:
-    if st.button("🎨 赛博霓虹", use_container_width=True): added_tags += ", cyberpunk aesthetic, neon neon glowing"
-    if st.button("🍃 极简主义", use_container_width=True): added_tags += ", minimalism, elegant clean composition"
-with tag_cols[3]:
-    if st.button("🎞️ 经典胶片", use_container_width=True): added_tags += ", 35mm film photography, vintage grain"
-    if st.button("🏛️ 史诗宏大", use_container_width=True): added_tags += ", epic scale, breathtaking scenery"
-
-# 文本框组件
-base_prompt = st.text_area(
-    "核心图像创意输入区 (支持中英文、支持上方标签组合):", 
+prompt = st.text_area(
+    "核心图像描述 (支持中文及英文):", 
     placeholder=st.session_state.current_placeholder,
-    height=90
+    height=100
 )
 
-# 组合最终用户输入的初始词
-user_input_prompt = base_prompt if base_prompt else (
-    "" if st.session_state.current_placeholder.startswith("请输入创意") else st.session_state.current_placeholder
-)
-if added_tags and user_input_prompt:
-    user_input_prompt += added_tags
-
-# 🎭 功能二：单图风格调色盘
+# --- 核心功能一：艺术风格大调色盘 ---
+st.write("🎨 **艺术风格大调色盘 (一键加缀大师级艺术滤镜):**")
 style_list = {
     "✨ 无滤镜自由发挥": "",
-    "🎬 电影级纪实感": ", cinematic lighting, 35mm photograph, depth of field, masterpiece",
-    "🍃 宫崎骏动漫风": ", Studio Ghibli style, beautiful anime aesthetic, hand-drawn, vibrant colors",
-    "💻 赛博朋克风": ", cyberpunk style, neon glowing, rainy night streets with reflections",
-    "🖋️ 传统国风写意": ", traditional Chinese ink wash painting, elegant brush strokes, zen concept",
-    "🧸 皮克斯3D动画": ", 3D animation character in Pixar style, cute design, highly detailed clay texture"
+    "🎬 电影级纪实感 (Cinematic, anamorphic lens, dramatic lighting)": ", cinematic lighting, 35mm photograph, dramatic lighting, shot on IMAX, depth of field, masterwork",
+    "🍃 宫崎骏动漫风 (Studio Ghibli style, anime aesthetics)": ", Studio Ghibli style, beautiful anime aesthetic, hand-drawn illustration, vibrant colors, nostalgic atmosphere",
+    "💻 赛博朋克风 (Cyberpunk, neon glowing, rainy night)": ", cyberpunk style, neon glowing, rainy night streets with reflections, holographic projections, futuristic high-tech",
+    "🌻 梵高后印象派 (Vincent van Gogh style, thick brush strokes)": ", oil on canvas in Vincent van Gogh style, thick textured brush strokes, vibrant swirling colors, post-impressionism",
+    "🖋️ 传统国风写意 (Traditional Chinese ink painting style)": ", traditional Chinese ink wash painting, ethereal watercolor wash, elegant brush strokes, artistic artistic concept, zen",
+    "🧸 皮克斯3D动画 (Pixar 3D animation style, cute character design)": ", 3D animation character in Pixar style, Disney aesthetics, cute, highly detailed clay texture, soft studio illumination",
+    "🎞️ 90年代黑白胶片 (1990s monochrome film style, classic grain)": ", 1990s monochrome film photography, black and white, classic cinematic grain, nostalgic atmosphere, high contrast"
 }
-chosen_style = st.selectbox("🎯 单图渲染模式下期望追加的风格滤镜：", list(style_list.keys()))
+chosen_style = st.selectbox("选择期望追加的视觉艺术风格：", list(style_list.keys()))
 
-# 高级折叠面板
+# --- 核心功能二：高级精细化渲染控制面板 ---
 with st.expander("🛠️ 影像精细化渲染高级控制面板", expanded=False):
     col1, col2 = st.columns(2)
     with col1:
-        aspect_ratio = st.selectbox("📐 图像画幅构图比例：", ["1:1 标准方形 (1024x1024)", "16:9 宽银幕壁纸 (1024x576)", "9:16 移动端海报 (576x1024)"])
+        aspect_ratio = st.selectbox(
+            "📐 图像构图画幅比例：",
+            ["1:1 标准方形 (1024x1024)", "16:9 宽银幕壁纸 (1024x576)", "9:16 移动端海报 (576x1024)"]
+        )
     with col2:
-        quality = st.selectbox("🎭 影像画质纯度：", ["standard", "hd"])
-    negative_prompt = st.text_input("🚫 负向排除词:", placeholder="例如：变形、低画质、模糊")
+        quality = st.selectbox("🎭 影像生成质量：", ["standard (标准影像)", "hd (超清影像增强)"])
+        
+    negative_prompt = st.text_input("🚫 负向提示词 (排除画面多余元素):", placeholder="例如：变形、低画质、崩坏的肢体、模糊、水印")
     
+    # --- 核心功能三：种子锁控制（连环画神器） ---
     st.markdown("---")
-    use_seed = st.checkbox("🔒 锁定特征种子 (连环画分镜专用)", value=False)
-    custom_seed = st.number_input("专属种子流水号：", min_value=1, max_value=9999999, value=88888)
+    st.write("🔒 **特征锁定矩阵 (创作连环画/分镜故事核心)：**")
+    use_seed = st.checkbox("固定特征种子 (开启后可微调文字进行画面连贯创作)", value=False)
+    custom_seed = st.number_input("设置固定的随机种子数值：", min_value=1, max_value=9999999, value=88888)
 
-size_mapping = {"1:1 标准方形 (1024x1024)": "1024x1024", "16:9 宽银幕壁纸 (1024x576)": "1024x576", "9:16 移动端海报 (576x1024)": "576x1024"}
+size_mapping = {
+    "1:1 标准方形 (1024x1024)": "1024x1024",
+    "16:9 宽银幕壁纸 (1024x576)": "1024x576",
+    "9:16 移动端海报 (576x1024)": "576x1024"
+}
 chosen_size = size_mapping[aspect_ratio]
 
-# ==================== 5. 影像异步构建分发中枢 ====================
-action_col1, action_col2 = st.columns(2)
-
-# 渲染单张图
-with action_col1:
-    if st.button("开始构建单张影像 ✨", type="primary", use_container_width=True):
-        if not user_input_prompt:
-            st.warning("系统提示：当前输入框内容为空！")
-        else:
-            display_text = user_input_prompt
-            with st.spinner("算力分配中..."):
-                if enable_translate:
-                    user_input_prompt = translate_and_optimize_prompt(CHAT_API_KEY, user_input_prompt)
-                user_input_prompt += style_list[chosen_style]
-                
-            with st.spinner("核心矩阵正在绘制影像..."):
-                payload = {"model": "gpt-image-2", "prompt": user_input_prompt, "n": 1, "size": chosen_size, "quality": quality}
-                if negative_prompt: payload["negative_prompt"] = negative_prompt
-                if use_seed: payload["seed"] = custom_seed
-                
-                img_bytes = send_image_request(payload)
-                if img_bytes:
-                    st.success("✨ 影像构建完成！")
-                    st.image(img_bytes, caption="当前生成的单图影像", use_container_width=True)
-                    st.download_button("⬇️ 下载高清原图", data=img_bytes, file_name="AIGC_Single.png", mime="image/png")
-                    st.session_state.history_images.insert(0, {"prompt": display_text, "bytes": img_bytes, "label": "单图渲染"})
-                else:
-                    st.error("影像矩阵数据溢出，构建失败，请重试。")
-
-# 🎭 功能三：盲盒四联画对比
-with action_col2:
-    if st.button("🎲 一键生成四种画风对比", use_container_width=True):
-        if not user_input_prompt:
-            st.warning("系统提示：请输入描述词以供四联矩阵演化！")
-        else:
-            display_text = user_input_prompt
-            with st.spinner("🌐 翻译中枢正在全局统一解算语义..."):
-                if enable_translate:
-                    optimized_base = translate_and_optimize_prompt(CHAT_API_KEY, user_input_prompt)
-                else:
-                    optimized_base = user_input_prompt
-
-            st.info("🚀 风格对比矩阵已启动，正在并行渲染 4 张不同艺术画作...")
+# ==================== 5. 影像异步构建与渲染 ====================
+if st.button("开始构建影像 ✨", type="primary"):
+    final_prompt = prompt if prompt else (None if st.session_state.current_placeholder.startswith("点击下方按钮") else st.session_state.current_placeholder)
+    
+    if not final_prompt:
+        st.warning("系统提示：检测到当前输入内容为空，请填写描述词或获取灵感！")
+    else:
+        # 保存用户看到的最初提示词用于后续在展厅展示
+        display_prompt = final_prompt
+        
+        with st.spinner("AI 正在执行底层逻辑运算，请稍候..."):
             
-            # 准备四种不同画风的咒语
-            modes = [
-                ("🎬 电影纪实", style_list["🎬 电影级纪实感"]),
-                ("🍃 宫崎动漫", style_list["🍃 宫崎骏动漫风"]),
-                ("🖋️ 国风水墨", style_list["🖋️ 传统国风写意"]),
-                ("🧸 皮克斯3D", style_list["🧸 皮克斯3D动画"])
-            ]
+            # 步骤 1：触发中译英及咒语润色引擎
+            if enable_translate:
+                with st.spinner("🌐 正在将提示词进化为高阶艺术英文咒语..."):
+                    final_prompt = translate_and_optimize_prompt(CHAT_API_KEY, final_prompt)
             
-            quad_results = []
-            # 建立四次后台流水线渲染
-            for name, suffix in modes:
-                with st.spinner(f"正在同步构建【{name}】维度的影像数据..."):
-                    payload = {"model": "gpt-image-2", "prompt": optimized_base + suffix, "n": 1, "size": chosen_size, "quality": quality}
-                    if negative_prompt: payload["negative_prompt"] = negative_prompt
-                    if use_seed: payload["seed"] = custom_seed
+            # 步骤 2：强行叠加风格调色盘尾缀
+            final_prompt += style_list[chosen_style]
+            
+            # 打印最终发送的硬核咒语在后台（方便调试）
+            st.info(f"🚀 系统分发核心咒语: `{final_prompt[:80]}...`")
+
+        with st.spinner("AI 正在解析多维向量并绘制影像，请稍候..."):
+            payload = {
+                "model": "gpt-image-2", 
+                "prompt": final_prompt, 
+                "n": 1, 
+                "size": chosen_size,
+                "quality": quality.split(" ")[0]
+            }
+            if negative_prompt:
+                payload["negative_prompt"] = negative_prompt
+            
+            # 如果开启了种子锁定器，将种子数值压入请求体
+            if use_seed:
+                payload["seed"] = custom_seed
+                
+            headers = {"Authorization": f"Bearer {IMAGE_API_KEY}", "User-Agent": "Mozilla/5.0"}
+            try:
+                res = requests.post(URL_GEN, headers=headers, json=payload)
+                if res.status_code == 200:
+                    b64 = res.json()["data"][0]["b64_json"]
+                    img_bytes = base64.b64decode(b64)
                     
-                    res_bytes = send_image_request(payload)
-                    if res_bytes:
-                        quad_results.append((name, res_bytes))
-            
-            # 在前端进行 2x2 并排经典排版
-            if len(quad_results) > 0:
-                st.success("✨ 四联艺术对比矩阵构建完成！")
-                q_cols = st.columns(2)
-                for idx, (name, b_data) in enumerate(quad_results):
-                    with q_cols[idx % 2]:
-                        st.image(b_data, caption=f"画风: {name}", use_container_width=True)
-                        st.download_button(f"⬇️ 下载 {name}", data=b_data, file_name=f"{name}.png", mime="image/png", key=f"quad_{idx}")
-                        # 顺便全部塞入历史展厅
-                        st.session_state.history_images.insert(0, {"prompt": display_text, "bytes": b_data, "label": name})
-            else:
-                st.error("矩阵算力阻塞，未能成功获取对比图。")
+                    st.success("✨ 核心影像构建完成！")
+                    st.image(img_bytes, caption="当前生成的影像结果", use_container_width=True)
+                    st.download_button("⬇️ 下载当前高清原图", data=img_bytes, file_name="AIGC_Result.png", mime="image/png", type="primary")
+                    
+                    # 自动打上标签存入历史陈列室
+                    st.session_state.history_images.insert(0, {"prompt": display_prompt, "bytes": img_bytes, "style": chosen_style.split(" ")[0]})
+                else:
+                    st.error(f"影像构建失败，状态码: {res.status_code} 原因: {res.text}")
+            except Exception as e:
+                st.error(f"网络计算节点发生错误: {e}")
 
-# ==================== 6. 核心功能四：历史陈列室与一键回填 ====================
+# ==================== 6. 历史创作成果陈列室 ====================
 if st.session_state.history_images:
     st.markdown("---")
     st.markdown("### 📜 历史创作成果陈列室 (本次会话)")
@@ -304,9 +206,4 @@ if st.session_state.history_images:
     for index, item in enumerate(st.session_state.history_images):
         with cols[index % 2]:
             st.image(item["bytes"], use_container_width=True)
-            st.caption(f"🎨 [{item['label']}] {item['prompt'][:15]}...")
-            
-            # 经典一键回填技术
-            if st.button(f"🔄 提取此提示词回填", key=f"reback_{index}"):
-                st.session_state.input_text_value = item["prompt"]
-                st.rerun()
+            st.caption(f"🎨 [{item['style']}] {item['prompt'][:18]}...")
