@@ -18,8 +18,8 @@ if not IMAGE_API_KEY or not CHAT_API_KEY:
     st.stop()
 
 # 核心接口地址
-URL_GEN = "https://api.nowcoding.ai/v1/images/generations"
-URL_CHAT = "https://api.nowcoding.ai/v1/chat/completions"
+URL_GEN = "https://nowcoding.ai/v1/images/generations"
+URL_CHAT = "https://nowcoding.ai/v1/chat/completions"
 
 # ==================== 使用“聊天密钥”获取灵感 ====================
 def get_random_prompt_from_cloud(api_key):
