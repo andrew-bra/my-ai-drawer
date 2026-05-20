@@ -55,8 +55,18 @@ if st.button("开始生成 ✨", type="primary"):
                         b64_string = res_data["data"][0]["b64_json"]
                         image_bytes = base64.b64decode(b64_string)
                         
-                        # 展示图片
-                        st.image(image_bytes, caption="生成结果（右键可另存为）", use_container_width=True)
+                                              # 展示图片
+                        st.image(image_bytes, caption="您的 AI 画作", use_container_width=True)
+                        
+                        # 新增：炫酷的下载按钮
+                        st.download_button(
+                            label="⬇️ 下载高清原图",
+                            data=image_bytes,
+                            file_name="AI_Art.png",
+                            mime="image/png",
+                            type="primary"
+                        )
+                        
                         st.success("✨ 生成成功啦！")
                         
                     except KeyError:
