@@ -3,22 +3,49 @@ import requests
 import base64
 import os
 import random
+import json
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# ==================== 1. 系统级专业配置 ====================
+# ==================== 1. 系统级配置与缓存初始化 ====================
 st.set_page_config(page_title="智能影像生成控制台", layout="centered")
 
-# 初始化系统缓存变量
+# 定义本地缓存文件夹
+CACHE_DIR = "image_cache"
+MANIFEST_FILE = os.path.join(CACHE_DIR, "manifest.json")
+
+# 确保缓存目录和索引账本存在
+if not os.path.exists(CACHE_DIR):
+    os.makedirs(CACHE_DIR)
+
+def load_manifest():
+    if os.path.exists(MANIFEST_FILE):
+        try:
+            with open(MANIFEST_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_manifest(data):
+    with open(MANIFEST_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+# 初始化状态变量
 if "current_placeholder" not in st.session_state:
-    st.session_state.current_placeholder = "点击下方按钮获取灵感，或在此直接输入您的创意描述..."
+    st.session_state.current_placeholder = "等待获取灵感，或直接在此输入您的创意..."
 if "is_loading" not in st.session_state:
     st.session_state.is_loading = False
-if "history_images" not in st.session_state:
-    st.session_state.history_images = []
+if "input_text_value" not in st.session_state:
+    st.session_state.input_text_value = ""
 
-# 读取环境变量密码
+# 响应历史词回填逻辑
+if st.session_state.input_text_value:
+    st.session_state.current_placeholder = st.session_state.input_text_value
+    st.session_state.input_text_value = "" # 用完清空
+
 IMAGE_API_KEY = os.getenv("MY_IMAGE_API_KEY")
 CHAT_API_KEY = os.getenv("MY_CHAT_API_KEY")
 
@@ -29,21 +56,22 @@ if not IMAGE_API_KEY or not CHAT_API_KEY:
 URL_GEN = "https://nowcoding.ai/v1/images/generations"
 URL_CHAT = "https://nowcoding.ai/v1/chat/completions"
 
-# ==================== 2. 核心大模型工具函数 ====================
-
-# 函数 A：获取反赛博随机灵感
+# ==================== 2. 云端获取反赛博轮盘函数 ====================
 def get_random_prompt_from_cloud(api_key):
     themes = [
-        "古代国风水墨（如：侠客、竹林、红灯笼、泼墨山水、写意意境）",
-        "大自然与写实摄影（如：微距露珠、深海鲸鱼、森林晨光、高清产品照、影棚布光）",
-        "欧洲魔幻奇幻（如：独角兽、中世纪骑士、神秘城堡、飞龙翱翔、史诗级画质）",
-        "复古温馨胶片（如：90年代老街、温馨午后、怀旧照、细腻颗粒感、暖色调）",
-        "童话治愈插画（如：魔法森林、梦幻绘本风格、星空下的萤火虫、色彩斑斓）",
-        "野生动物史诗（如：远古巨兽、雪原狼群、雄鹰展翅、震撼构图、纤毫毕现）"
+        "古代国风水墨（如：侠客、竹林、红灯笼、泼墨山水）",
+        "大自然与写实摄影（如：微距露珠、深海鲸鱼、森林晨光、高清产品照）",
+        "欧洲魔幻奇幻（如：独角兽、中世纪骑士、神秘城堡、飞龙翱翔）",
+        "复古温馨胶片（如：90年代老街、温馨午后、怀旧照、颗粒感）",
+        "童话治愈插画（如：小巧可爱的Pip、魔法森林、梦幻绘本风格）",
+        "野生动物史诗（如：远古巨兽、雪原狼群、雄鹰展翅、震撼构图）"
     ]
     chosen_theme = random.choice(themes)
 
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
     payload = {
         "model": "gpt-5.3-codex",
         "messages": [
@@ -54,69 +82,52 @@ def get_random_prompt_from_cloud(api_key):
     }
     try:
         res = requests.post(URL_CHAT, headers=headers, json=payload, timeout=10)
-        return res.json()["choices"][0]["message"]["content"].strip() if res.status_code == 200 else "灵感检索失败"
-    except:
-        return "服务器连接超时"
+        if res.status_code == 200:
+            return res.json()["choices"][0]["message"]["content"].strip()
+        else:
+            return f"报错啦！状态码 {res.status_code}，服务器说：{res.text}"
+    except Exception as e:
+        return f"网络连接超时：{e}"
 
-# 函数 B：智能中译英与咒语优化引擎
-def translate_and_optimize_prompt(api_key, user_prompt):
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {
-        "model": "gpt-5.3-codex",
-        "messages": [
-            {"role": "system", "content": "You are a master of AI art prompts, skilled in Midjourney and DALL-E 3 syntax."},
-            {"role": "user", "content": f"请把这句中文提示词翻译成高阶英文绘图咒语：'{user_prompt}'。请扩充细节，加入专业的光影、镜头（如 volumetric lighting, cinematic, 8k, hyper-detailed）等艺术修饰词。注意：直接输出最终的英文提示词，绝对不要包含任何中文、不要有解释、不要带引号。"}
-        ],
-        "temperature": 0.7
+# 本地资产保存函数
+def save_asset_to_local(prompt_text, img_bytes):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    filename = f"img_{timestamp}.png"
+    filepath = os.path.join(CACHE_DIR, filename)
+    
+    # 写入二进制图片
+    with open(filepath, "wb") as f:
+        f.write(img_bytes)
+        
+    # 追加账本清单
+    manifest = load_manifest()
+    new_entry = {
+        "id": timestamp,
+        "filename": filename,
+        "prompt": prompt_text,
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
-    try:
-        res = requests.post(URL_CHAT, headers=headers, json=payload, timeout=10)
-        return res.json()["choices"][0]["message"]["content"].strip() if res.status_code == 200 else user_prompt
-    except:
-        return user_prompt
+    manifest.insert(0, new_entry)
+    save_manifest(manifest)
 
-# ==================== 3. 视觉美化：科技感大横幅 ====================
-st.markdown("""
-<div style="background: linear-gradient(90deg, #0f2027 0%, #203a43 50%, #2c5364 100%); padding: 22px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
-    <h2 style="color: white; margin: 0; text-align: center; font-family: Arial; letter-spacing: 2px;">AIGC 智能影像生成控制台</h2>
-    <p style="color: #00ecff; margin: 5px 0 0 0; text-align: center; font-size: 13px; font-weight: bold;">PREMIUM COMPREHENSIVE PRODUCTION WORKSTATION · 至尊全功能版</p>
-</div>
-""", unsafe_allow_html=True)
+# ==================== 3. 页面视觉与输入区 ====================
+st.title("💻 智绘AI：专业级图像内容生成系统")
+st.write("请在下方输入您的创意描述，本系统将为您调用核心大模型进行全功能影像构建：")
 
-# ==================== 4. 核心输入与控制区 ====================
-col_btn1, col_btn2 = st.columns([1, 1])
-with col_btn1:
-    if st.button("🎲 获取随机灵感创意", disabled=st.session_state.is_loading, use_container_width=True):
-        st.session_state.is_loading = True
-        with st.spinner("📊 正在检索创意数据库并构建核心提示词..."):
-            st.session_state.current_placeholder = get_random_prompt_from_cloud(CHAT_API_KEY)
-        st.session_state.is_loading = False
-        st.rerun()
-with col_btn2:
-    # 智能翻译引擎开关
-    enable_translate = st.toggle("🌐 开启中译英智能咒语优化引擎", value=True, help="强烈建议开启！用AI把中文大白话进化成电影级英文高级咒语，画质翻倍。")
+# 按钮：获取灵感（带防刷新锁）
+if st.button("🎲 从云端获取随机灵感", disabled=st.session_state.is_loading):
+    st.session_state.is_loading = True
+    with st.spinner("📊 正在检索创意数据库并构建核心提示词..."):
+        st.session_state.current_placeholder = get_random_prompt_from_cloud(CHAT_API_KEY)
+    st.session_state.is_loading = False
+    st.rerun()
 
 prompt = st.text_area(
-    "核心图像描述 (支持中文及英文):", 
-    placeholder=st.session_state.current_placeholder,
-    height=100
+    "输入画面描述 (支持中文和英文):", 
+    placeholder=st.session_state.current_placeholder
 )
 
-# --- 核心功能一：艺术风格大调色盘 ---
-st.write("🎨 **艺术风格大调色盘 (一键加缀大师级艺术滤镜):**")
-style_list = {
-    "✨ 无滤镜自由发挥": "",
-    "🎬 电影级纪实感 (Cinematic, anamorphic lens, dramatic lighting)": ", cinematic lighting, 35mm photograph, dramatic lighting, shot on IMAX, depth of field, masterwork",
-    "🍃 宫崎骏动漫风 (Studio Ghibli style, anime aesthetics)": ", Studio Ghibli style, beautiful anime aesthetic, hand-drawn illustration, vibrant colors, nostalgic atmosphere",
-    "💻 赛博朋克风 (Cyberpunk, neon glowing, rainy night)": ", cyberpunk style, neon glowing, rainy night streets with reflections, holographic projections, futuristic high-tech",
-    "🌻 梵高后印象派 (Vincent van Gogh style, thick brush strokes)": ", oil on canvas in Vincent van Gogh style, thick textured brush strokes, vibrant swirling colors, post-impressionism",
-    "🖋️ 传统国风写意 (Traditional Chinese ink painting style)": ", traditional Chinese ink wash painting, ethereal watercolor wash, elegant brush strokes, artistic artistic concept, zen",
-    "🧸 皮克斯3D动画 (Pixar 3D animation style, cute character design)": ", 3D animation character in Pixar style, Disney aesthetics, cute, highly detailed clay texture, soft studio illumination",
-    "🎞️ 90年代黑白胶片 (1990s monochrome film style, classic grain)": ", 1990s monochrome film photography, black and white, classic cinematic grain, nostalgic atmosphere, high contrast"
-}
-chosen_style = st.selectbox("选择期望追加的视觉艺术风格：", list(style_list.keys()))
-
-# --- 核心功能二：高级精细化渲染控制面板 ---
+# ==================== 4. 2.0版高级控制面板 ====================
 with st.expander("🛠️ 影像精细化渲染高级控制面板", expanded=False):
     col1, col2 = st.columns(2)
     with col1:
@@ -125,15 +136,13 @@ with st.expander("🛠️ 影像精细化渲染高级控制面板", expanded=Fal
             ["1:1 标准方形 (1024x1024)", "16:9 宽银幕壁纸 (1024x576)", "9:16 移动端海报 (576x1024)"]
         )
     with col2:
-        quality = st.selectbox("🎭 影像生成质量：", ["standard (标准影像)", "hd (超清影像增强)"])
+        quality = st.selectbox("🎭 影像生成模式：", ["standard", "hd"])
         
-    negative_prompt = st.text_input("🚫 负向提示词 (排除画面多余元素):", placeholder="例如：变形、低画质、崩坏的肢体、模糊、水印")
+    negative_prompt = st.text_input("🚫 负向提示词 (不希望出现的元素):", placeholder="例如：变形、低画质、模糊")
     
-    # --- 核心功能三：种子锁控制（连环画神器） ---
     st.markdown("---")
-    st.write("🔒 **特征锁定矩阵 (创作连环画/分镜故事核心)：**")
-    use_seed = st.checkbox("固定特征种子 (开启后可微调文字进行画面连贯创作)", value=False)
-    custom_seed = st.number_input("设置固定的随机种子数值：", min_value=1, max_value=9999999, value=88888)
+    use_seed = st.checkbox("🔒 固定特征种子 (连环画微调专用)", value=False)
+    custom_seed = st.number_input("设置固定种子数值：", min_value=1, max_value=9999999, value=88888)
 
 size_mapping = {
     "1:1 标准方形 (1024x1024)": "1024x1024",
@@ -142,68 +151,82 @@ size_mapping = {
 }
 chosen_size = size_mapping[aspect_ratio]
 
-# ==================== 5. 影像异步构建与渲染 ====================
-if st.button("开始构建影像 ✨", type="primary"):
-    final_prompt = prompt if prompt else (None if st.session_state.current_placeholder.startswith("点击下方按钮") else st.session_state.current_placeholder)
+# ==================== 5. 任务提交与渲染 ====================
+if st.button("开始生成 ✨", type="primary"):
+    final_prompt = prompt if prompt else (
+        None if st.session_state.current_placeholder.startswith("等待获取") else st.session_state.current_placeholder
+    )
     
     if not final_prompt:
-        st.warning("系统提示：检测到当前输入内容为空，请填写描述词或获取灵感！")
+        st.warning("请输入描述词，或先点击获取灵感！")
     else:
-        # 保存用户看到的最初提示词用于后续在展厅展示
-        display_prompt = final_prompt
-        
-        with st.spinner("AI 正在执行底层逻辑运算，请稍候..."):
-            
-            # 步骤 1：触发中译英及咒语润色引擎
-            if enable_translate:
-                with st.spinner("🌐 正在将提示词进化为高阶艺术英文咒语..."):
-                    final_prompt = translate_and_optimize_prompt(CHAT_API_KEY, final_prompt)
-            
-            # 步骤 2：强行叠加风格调色盘尾缀
-            final_prompt += style_list[chosen_style]
-            
-            # 打印最终发送的硬核咒语在后台（方便调试）
-            st.info(f"🚀 系统分发核心咒语: `{final_prompt[:80]}...`")
-
-        with st.spinner("AI 正在解析多维向量并绘制影像，请稍候..."):
+        with st.spinner("AI 正在解析全功能影像，请稍候..."):
             payload = {
                 "model": "gpt-image-2", 
                 "prompt": final_prompt, 
                 "n": 1, 
                 "size": chosen_size,
-                "quality": quality.split(" ")[0]
+                "quality": quality
             }
             if negative_prompt:
                 payload["negative_prompt"] = negative_prompt
-            
-            # 如果开启了种子锁定器，将种子数值压入请求体
             if use_seed:
                 payload["seed"] = custom_seed
                 
-            headers = {"Authorization": f"Bearer {IMAGE_API_KEY}", "User-Agent": "Mozilla/5.0"}
+            headers = {
+                "Authorization": f"Bearer {IMAGE_API_KEY}",
+                "User-Agent": "Mozilla/5.0"
+            }
             try:
                 res = requests.post(URL_GEN, headers=headers, json=payload)
                 if res.status_code == 200:
                     b64 = res.json()["data"][0]["b64_json"]
                     img_bytes = base64.b64decode(b64)
                     
-                    st.success("✨ 核心影像构建完成！")
-                    st.image(img_bytes, caption="当前生成的影像结果", use_container_width=True)
-                    st.download_button("⬇️ 下载当前高清原图", data=img_bytes, file_name="AIGC_Result.png", mime="image/png", type="primary")
+                    st.success("✨ 影像构建成功！并已自动缓存至本地！")
+                    st.image(img_bytes, caption="生成影像结果", use_container_width=True)
                     
-                    # 自动打上标签存入历史陈列室
-                    st.session_state.history_images.insert(0, {"prompt": display_prompt, "bytes": img_bytes, "style": chosen_style.split(" ")[0]})
+                    # 核心改动：生图成功后，立刻持久化到本地硬盘
+                    save_asset_to_local(final_prompt, img_bytes)
+                    st.rerun() # 刷新页面，让下方的本地列表同步显示
                 else:
-                    st.error(f"影像构建失败，状态码: {res.status_code} 原因: {res.text}")
+                    st.error(f"构建失败，状态码: {res.status_code} 原因: {res.text}")
             except Exception as e:
-                st.error(f"网络计算节点发生错误: {e}")
+                st.error(f"网络请求发生错误: {e}")
 
-# ==================== 6. 历史创作成果陈列室 ====================
-if st.session_state.history_images:
+# ==================== 6. 本地硬盘持久化展厅与物理删除 ====================
+manifest_data = load_manifest()
+
+if manifest_data:
     st.markdown("---")
-    st.markdown("### 📜 历史创作成果陈列室 (本次会话)")
-    cols = st.columns(2)
-    for index, item in enumerate(st.session_state.history_images):
-        with cols[index % 2]:
-            st.image(item["bytes"], use_container_width=True)
-            st.caption(f"🎨 [{item['style']}] {item['prompt'][:18]}...")
+    st.markdown("### 📜 本地硬盘持久化历史列表")
+    
+    for idx, item in enumerate(manifest_data):
+        filepath = os.path.join(CACHE_DIR, item["filename"])
+        if os.path.exists(filepath):
+            with st.container():
+                col_img, col_info = st.columns([1, 1.2])
+                with col_img:
+                    st.image(filepath, use_container_width=True)
+                with col_info:
+                    st.markdown(f"**📅 缓存时间:** `{item['time']}`")
+                    st.markdown(f"**🎨 初始提示词:**")
+                    st.write(item["prompt"])
+                    
+                    # 功能控制组
+                    ctrl_col1, ctrl_col2 = st.columns(2)
+                    with ctrl_col1:
+                        # 一键把历史提示词填回输入框
+                        if st.button("🔄 提取词回填", key=f"back_{item['id']}_{idx}"):
+                            st.session_state.input_text_value = item["prompt"]
+                            st.rerun()
+                    with ctrl_col2:
+                        # 物理删除：从硬盘和清单同步抹除
+                        if st.button("🗑️ 物理删除文件", key=f"del_{item['id']}_{idx}"):
+                            if os.path.exists(filepath):
+                                os.remove(filepath)
+                            updated_manifest = [x for x in manifest_data if x["id"] != item["id"]]
+                            save_manifest(updated_manifest)
+                            st.success("文件已从磁盘物理抹除！")
+                            st.rerun()
+            st.markdown("---")
