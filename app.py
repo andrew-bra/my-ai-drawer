@@ -40,7 +40,8 @@ def get_random_prompt_from_cloud(api_key):
         if res.status_code == 200:
             return res.json()["choices"][0]["message"]["content"].strip()
         else:
-            return f"灵感获取失败 (状态码 {res.status_code})"
+            # 核心修改：强制输出服务器返回的详细原生错误信息！
+            return f"报错啦！状态码 {res.status_code}，服务器说：{res.text}"
     except Exception as e:
         return f"网络连接超时：{e}"
 
