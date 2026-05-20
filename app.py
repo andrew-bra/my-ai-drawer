@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-st.set_page_config(page_title="AI 图像内容全功能创作平台", layout="centered")
-st.title("💻 智绘AI：专业级图像内容生成系统")
+st.set_page_config(page_title="AI 创意视觉系统", layout="centered")
+st.title("个人智能视觉创意中心")
 
 # 分别读取两个环境变量密码
 IMAGE_API_KEY = os.getenv("MY_IMAGE_API_KEY")
@@ -31,7 +31,7 @@ def get_random_prompt_from_cloud(api_key):
         "model": "gpt-5.3-codex", # 对应 Codex 官方分组的基础模型
         "messages": [
             {"role": "system", "content": "你是一个顶级的AI绘画提示词专家。"},
-            {"role": "user", "content": "请随机生成一条极具画面感、高质量的AI绘图提示词。可以是科幻、奇幻、复古、写实等任意风格。要求：直接输出提示词内容，不要有任何废话，不要带引号，控制在60个字以内，必须是中文。"}
+            {"role": "user", "content": "请随机生成一条极具画面感、高质量的AI绘图提示词。要求：直接输出提示词内容，不要有任何废话，不要带引号，控制在60个字以内，必须是中文。"}
         ],
         "temperature": 0.9
     }
@@ -50,11 +50,20 @@ if "current_placeholder" not in st.session_state:
 
 st.write("请在下方输入您的创意描述，本系统将为您调用核心大模型进行全功能影像构建：")
 
-if st.button("🎲 从云端获取随机灵感"):
-    with st.spinner("🧠 正在连接云端大模型进行头脑风暴..."):
-        # 传入对话专用密钥
+# 升级版：加入状态锁，防止在获取过程中重复触发刷新
+if "is_loading" not in st.session_state:
+    st.session_state.is_loading = False
+
+# 只有在非加载状态下才允许点击
+if st.button("🎲 获取随机灵感创意", disabled=st.session_state.is_loading):
+    st.session_state.is_loading = True  # 锁定状态
+    
+    with st.spinner("📊 正在获取..."):
+        # 真正开始去向模型要灵感
         st.session_state.current_placeholder = get_random_prompt_from_cloud(CHAT_API_KEY)
-    st.rerun()
+        
+    st.session_state.is_loading = False  # 解锁状态
+    st.rerun()  # 刷新页面展示新词
 
 prompt = st.text_area(
     "输入画面描述 (支持中文和英文):", 
